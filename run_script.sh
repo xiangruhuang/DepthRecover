@@ -1,2 +1,2 @@
 #!/bin/bash
-sbatch script_template
+sbatch -A CS395T-Advanced-Geom script_template

@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -J JOBNAME
-#SBATCH -o LOGNAME
+#SBATCH -J job
+#SBATCH -o log
 #SBATCH -n 4
 #SBATCH -p gpu
 #SBATCH -t 12:00:00
