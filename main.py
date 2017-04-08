@@ -9,7 +9,7 @@ flags = tf.flags
 """     System and File I/O         """
 flags.DEFINE_string("data_path", 'data/merged_100.npy', "path to train/test/valid data.")
 flags.DEFINE_string("model_dir", None, "where to output model and tensorboard")
-flags.DEFINE_string("device", None, "visible device")
+flags.DEFINE_string("device", "1", "visible device")
 
 """     Data Specs                  """
 flags.DEFINE_integer("height", 240, "height of images")
@@ -17,19 +17,56 @@ flags.DEFINE_integer("width", 320, "width of images")
 flags.DEFINE_integer("channels", 4, "number of channels")
 
 """     Network Architecture        """
-flags.DEFINE_string("kernel_size", '5,5', "size of kernel {5,5}")
+flags.DEFINE_string("kernel_size", '7,7', "size of kernel {7,7}")
 
 """     Learning Parameters         """
 flags.DEFINE_float("learning_rate", 1e-3, "learing rate {1e-3}")
 flags.DEFINE_integer("max_epoch", 100, "max number of epochs to run {100}")
-flags.DEFINE_integer("batch_size", 10, "#minibatch each batch {1}")
+flags.DEFINE_integer("batch_size", 10, "#minibatch each batch {10}")
 
 FLAGS = flags.FLAGS
+
+import os
+
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"]=FLAGS.device
+
+def hourglass(inputs, depth):
+    kernel_size = [int(token) for token in FLAGS.kernel_size.split(',')]
+
+    last_layer = inputs
+
+    for d in range(depth):
+        conv_d = tf.layers.conv2d(
+                inputs=last_layer,
+                filters=32,
+                strides=[2,2],
+                kernel_size=kernel_size,
+                padding="same",
+                activation=tf.nn.relu,
+                )
+        print('conv%d.shape=%s'% (d, str(conv_d.shape)))
+        last_layer = conv_d
+    
+    for d in range(depth):
+        deconv_d = tf.layers.conv2d_transpose(
+                inputs=last_layer,
+                filters=32,
+                strides=[2,2],
+                kernel_size=kernel_size,
+                padding="same",
+                activation=tf.nn.relu,
+                )
+        print('deconv%d.shape=%s'% (d, str(deconv_d.shape)))
+        last_layer = deconv_d
+
+    return last_layer 
 
 def build_dataflow(data):
     #indices = tf.placeholder(shape=[FLAGS.batch_size], dtype=tf.int32)
     sample_size = data.shape.as_list()[0]
     print('total_sample_size=%d' % sample_size)
+    #shuffle = tf.range(0, limit=sample_size)
     shuffle = tf.random_shuffle(tf.range(0, limit=sample_size))
     indices = shuffle[:FLAGS.batch_size]
     batch_data = tf.gather(data, indices)
@@ -43,82 +80,34 @@ def build_dataflow(data):
     inputs = tf.stack(channels, axis=3)
     assert inputs.shape.as_list() == [FLAGS.batch_size, FLAGS.height, \
             FLAGS.width, FLAGS.channels+1]
-
+    
     kernel_size = [int(token) for token in FLAGS.kernel_size.split(',')]
 
-    conv1 = tf.layers.conv2d(
-            inputs=inputs,
-            filters=32,
+    last_layer = inputs
+    for i in range(3):
+        last_layer = hourglass(last_layer, 3)
+
+    last_layer = tf.layers.conv2d(
+            inputs=last_layer,
+            filters=1,
             kernel_size=kernel_size,
-            padding="same",
-            activation=tf.nn.relu,
-            )
-    print('conv1.shape=%s'% str(conv1.shape))
-    pool1 = tf.layers.max_pooling2d(
-            inputs=conv1,
-            pool_size=[2,2],
-            strides=2
+            strides=(1,1),
+            padding='same',
             )
 
-    print('pool1.shape=%s'% str(pool1.shape))
-    
-    conv2 = tf.layers.conv2d(
-            inputs=pool1,
-            filters=32,
-            kernel_size=kernel_size,
-            padding="same",
-            activation=tf.nn.relu,
-            )
-    print('conv2.shape=%s'% str(conv2.shape))
+    #print(last_layer.shape)
+    loss = tf.nn.l2_loss(tf.squeeze(last_layer, axis=-1)-grouth_truth)
 
-    pool2 = tf.layers.max_pooling2d(
-            inputs=conv2,
-            pool_size=[2,2],
-            strides=2
-            )
+    optimizer = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate)
+    opt = optimizer.minimize(loss)
 
-    print('pool2.shape=%s'% str(pool2.shape))
-
-    conv3 = tf.layers.conv2d(
-            inputs=pool2,
-            filters=32,
-            kernel_size=kernel_size,
-            padding="same",
-            activation=tf.nn.relu,
-            )
-    print('conv3.shape=%s'% str(conv3.shape))
-
-    pool3 = tf.layers.max_pooling2d(
-            inputs=conv3,
-            pool_size=[2,2],
-            strides=2
-            )
-
-    print('pool3.shape=%s'% str(pool3.shape))
-
-    pool3_flat = tf.reshape(pool3, [FLAGS.batch_size, -1])
-
-    print('pool3_flat.shape=%s'% str(pool3_flat.shape))
-    
-    dense1 = tf.layers.dense(inputs=pool3_flat, units=FLAGS.height*FLAGS.width,
-            activation = tf.nn.relu)
-    
-    #dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=True)
-    
-    dense2 = tf.layers.dense(inputs=dense1, units=FLAGS.height*FLAGS.width,
-            activation = tf.nn.relu)
-
-    final = tf.reshape(dense2, [FLAGS.batch_size, FLAGS.height, FLAGS.width])
-
-    loss = tf.nn.l2_loss(final-grouth_truth)
-
-    optimizer = tf.contrib.layers.optimize_loss(
-            loss=loss,
-            global_step=tf.contrib.framework.get_global_step(),
-            learning_rate=0.001,
-            optimizer="SGD"
-            )
-    evals = {'opt':optimizer, 'loss':loss}
+    #optimizer = tf.contrib.layers.optimize_loss(
+    #        loss=loss,
+    #        global_step=tf.contrib.framework.get_global_step(),
+    #        learning_rate=FLAGS.learning_rate,
+    #        optimizer="SGD"
+    #        )
+    evals = {'opt':opt, 'loss':loss}
     return evals
 
 def main(_):

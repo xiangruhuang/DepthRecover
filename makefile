@@ -1,5 +1,5 @@
-all: mnist.pkl
+all: data/merged_100.npy
 	python cnn_mnist.py
 
-mnist.pkl: mnist.pkl.gz
-	gunzip -k $<
+data/merged_100.npy:
+	make -C ./data merged_100.npy
