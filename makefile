@@ -8,7 +8,7 @@ all: data/merged_100.npy
 	$(eval model_dir := vanilla/run_$(namesuffix))
 	mkdir -p $(model_dir)
 	cat script_template | sed "s/LOGNAME/vanilla\/run_$(namesuffix)\/log/" > $(model_dir)/script
-	echo "((stdbuf -oL python main.py --model_dir$(model_dir) --batch_size=$(batch_size) --learning_rate=$(learning_rate) --kernel_sizes=$(kernel_sizes)) 2>&1) > $(model_dir)/log" >> $(model_dir)/script
+	echo "((stdbuf -oL python main.py --model_dir=$(model_dir) --batch_size=$(batch_size) --learning_rate=$(learning_rate) --kernel_sizes=$(kernel_sizes)) 2>&1) > $(model_dir)/log" >> $(model_dir)/script
 	sbatch -A CS395T-Advanced-Geom $(model_dir)/script
 	#((stdbuf -oL python main.py --model_dir=$(model_dir) --batch_size=$(batch_size) --learning_rate=$(learning_rate) --kernel_sizes=$(kernel_sizes)) 2>&1) > $(model_dir)/log
 	#python main.py --batch_size=$(batch_size) --learning_rate=$(learning_rate) --kernel_sizes=$(kernel_sizes)
