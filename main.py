@@ -127,6 +127,29 @@ def generate_RGBA(img):
     norm = plt.Normalize(vmin=img.min(), vmax=img.max())
     return cmap(norm(img))
 
+"""Load variables and Return current epoch
+Args:
+    var_list: list of variables to restore
+    load_dir: directory containing checkpoints, latest checkpoint is loaded
+
+Returns:
+    current_epoch: i.e. the suffix of the latest checkpoint file
+"""
+def load_vars(sess, var_list, load_dir):
+    if len(var_list) == 0:
+        return
+    loader = tf.train.Saver(var_list)
+
+    lc = tf.train.latest_checkpoint(load_dir+'/')
+    if lc is not None:
+        var_names = [v.name for v in var_list]
+        print("restoring %s from %s" % (str(var_names), load_dir+'/'))
+        loader.restore(sess, lc)
+        return int(str(lc).split('step-')[-1])
+    else:
+        print('nothing exists in %s' % load_dir)
+        return -1
+
 def main(_):
     print('batch_size=%d' % FLAGS.batch_size)
     data = numpy.load(FLAGS.data_path)
@@ -151,9 +174,11 @@ def main(_):
     train_evals, summary_evals = build_dataflow(data, indices)
     saver = tf.train.Saver(tf.trainable_variables())
 
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        for i in range(100000):
+        current_step = load_vars(sess, tf.trainable_variables(), FLAGS.model_dir)
+        for i in range(current_step+1, 100000):
             vals = sess.run(train_evals,
                 feed_dict={indices:sess.run(shuffle_indices)})
             print('iter=%d, loss=%f' % (i, vals['loss']))
