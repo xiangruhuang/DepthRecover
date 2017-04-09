@@ -19,7 +19,7 @@ data/merged_100.npy:
 null:=
 space:= $(null) #
 comma:= ,
-data=omnetpp
+data=vanilla
 port=10888
 
 plot_tensorboard:
@@ -31,3 +31,7 @@ plot_tensorboard:
 	$(eval LOGDIR := $(foreach name,$(names),$(name):$(data)/$(name)/tensorboard))
 	$(eval LOGDIR := $(subst $(space),$(comma),$(LOGDIR)))
 	tensorboard --logdir=$(LOGDIR) --port=$(port)
+
+folder=vanilla
+boards_under:
+	tensorboard --logdir=$(folder) --port=$(port)
