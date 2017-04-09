@@ -1,9 +1,8 @@
 #!/bin/bash
 #SBATCH -J job
-#SBATCH -o log
+#SBATCH -o LOGNAME
 #SBATCH -n 4
 #SBATCH -p gpu
 #SBATCH -t 12:00:00
 #SBATCH --mail-user=xrhuang@cs.utexas.edu
 #SBATCH --mail-type=end
-make
